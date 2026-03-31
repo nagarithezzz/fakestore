@@ -6,7 +6,7 @@ from app.models.cdr import CDRType
 
 
 class CDRCreate(BaseModel):
-    user_id: int
+    user_id: str
     type: CDRType
     duration: int = Field(default=0, ge=0)
     data_used: float = Field(default=0.0, ge=0)
@@ -15,8 +15,8 @@ class CDRCreate(BaseModel):
 
 
 class CDROut(BaseModel):
-    id: int
-    user_id: int
+    id: str
+    user_id: str
     type: CDRType
     duration: int
     data_used: float

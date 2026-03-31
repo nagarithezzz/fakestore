@@ -4,14 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
-from app.core.database import Base, engine, ensure_database_exists
-import app.models
+from app.core.database import ensure_indexes, get_database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    ensure_database_exists()
-    Base.metadata.create_all(bind=engine)
+    ensure_indexes(get_database())
     yield
 
 

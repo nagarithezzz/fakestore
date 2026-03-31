@@ -1,22 +1,21 @@
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.exceptions.custom_exceptions import bad_request, unauthorized
 from app.models.user import UserRole
+from app.repositories.plan_repository import PlanRepository
 from app.repositories.user_repository import UserRepository
 from app.core.security import hash_password, verify_password, create_access_token
 
 
 class AuthService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._db = db
         self._users = UserRepository(db)
 
-    def register(self, name: str, mobile_number: str, password: str, plan_id: int | None) -> dict:
+    def register(self, name: str, mobile_number: str, password: str, plan_id: str | None) -> dict:
         if self._users.get_by_mobile(mobile_number):
             raise bad_request("Mobile number already registered")
         if plan_id is not None:
-            from app.repositories.plan_repository import PlanRepository
-
             if not PlanRepository(self._db).get_by_id(plan_id):
                 raise bad_request("Invalid plan_id")
         user = self._users.create(

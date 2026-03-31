@@ -6,18 +6,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
-from app.core.database import SessionLocal
+from app.core.database import get_database
 from app.models.cdr import CDRType
-from app.models.user import User
 from app.services.cdr_service import CDRService
 
 
 @dataclass
 class GeneratedCDR:
-    user_id: int
+    user_id: str
     cdr_type: CDRType
     duration: int
     data_used: float
@@ -29,7 +27,7 @@ def random_mobile(rng: random.Random) -> str:
     return f"9{rng.randint(0, 999999999):09d}"
 
 
-def random_cdr(user_id: int, rng: random.Random, now: datetime | None = None) -> GeneratedCDR:
+def random_cdr(user_id: str, rng: random.Random, now: datetime | None = None) -> GeneratedCDR:
     cdr_type = rng.choice([CDRType.call, CDRType.sms, CDRType.data])
     anchor = now or datetime.now(timezone.utc)
     ts = anchor - timedelta(minutes=rng.randint(0, 60 * 24 * 30))
@@ -63,17 +61,17 @@ def random_cdr(user_id: int, rng: random.Random, now: datetime | None = None) ->
 
 
 def generate_for_users(
-    db: Session,
+    db: Database,
     records_per_user: int = 25,
     seed: int | None = None,
     now: datetime | None = None,
 ) -> int:
     rng = random.Random(seed)
-    users = list(db.execute(select(User.id)).scalars().all())
+    user_ids = [str(doc["_id"]) for doc in db["users"].find({}, {"_id": 1})]
     service = CDRService(db)
     created = 0
 
-    for user_id in users:
+    for user_id in user_ids:
         for _ in range(records_per_user):
             cdr = random_cdr(user_id=user_id, rng=rng, now=now)
             service.add_record(
@@ -89,11 +87,8 @@ def generate_for_users(
 
 
 def run(records_per_user: int = 25, seed: int | None = None) -> int:
-    db = SessionLocal()
-    try:
-        return generate_for_users(db=db, records_per_user=records_per_user, seed=seed)
-    finally:
-        db.close()
+    db = get_database()
+    return generate_for_users(db=db, records_per_user=records_per_user, seed=seed)
 
 
 if __name__ == "__main__":

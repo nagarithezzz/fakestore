@@ -1,10 +1,10 @@
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.repositories.plan_repository import PlanRepository
 
 
 class PlanService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._db = db
         self._plans = PlanRepository(db)
 

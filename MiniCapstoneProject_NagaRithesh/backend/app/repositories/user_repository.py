@@ -1,29 +1,46 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
+from bson import ObjectId
+from pymongo.database import Database
+
+from app.core.mongo_ids import parse_object_id, str_id
 from app.models.user import User, UserRole
 
 
-class UserRepository:
-    def __init__(self, db: Session):
-        self._db = db
+def _doc_to_user(doc: dict) -> User:
+    return User(
+        id=str_id(doc["_id"]),
+        name=doc["name"],
+        mobile_number=doc["mobile_number"],
+        hashed_password=doc["hashed_password"],
+        role=UserRole(doc["role"]),
+        plan_id=str(doc["plan_id"]) if doc.get("plan_id") else None,
+        created_at=doc.get("created_at"),
+    )
 
-    def get_by_id(self, user_id: int) -> User | None:
-        return self._db.get(User, user_id)
+
+class UserRepository:
+    def __init__(self, db: Database):
+        self._col = db["users"]
+
+    def get_by_id(self, user_id: str) -> User | None:
+        try:
+            oid = parse_object_id(user_id)
+        except ValueError:
+            return None
+        doc = self._col.find_one({"_id": oid})
+        return _doc_to_user(doc) if doc else None
 
     def get_by_mobile(self, mobile_number: str) -> User | None:
-        stmt = select(User).where(User.mobile_number == mobile_number)
-        return self._db.execute(stmt).scalar_one_or_none()
+        doc = self._col.find_one({"mobile_number": mobile_number})
+        return _doc_to_user(doc) if doc else None
 
     def list_all(self) -> list[User]:
-        stmt = select(User).order_by(User.id)
-        return list(self._db.execute(stmt).scalars().all())
+        docs = self._col.find().sort("_id", 1)
+        return [_doc_to_user(d) for d in docs]
 
     def count(self) -> int:
-        from sqlalchemy import func
-
-        stmt = select(func.count()).select_from(User)
-        return int(self._db.execute(stmt).scalar_one())
+        return self._col.count_documents({})
 
     def create(
         self,
@@ -31,16 +48,20 @@ class UserRepository:
         mobile_number: str,
         hashed_password: str,
         role: UserRole,
-        plan_id: int | None,
+        plan_id: str | None,
     ) -> User:
-        user = User(
-            name=name,
-            mobile_number=mobile_number,
-            hashed_password=hashed_password,
-            role=role,
-            plan_id=plan_id,
-        )
-        self._db.add(user)
-        self._db.commit()
-        self._db.refresh(user)
-        return user
+        now = datetime.now(timezone.utc)
+        doc: dict = {
+            "name": name,
+            "mobile_number": mobile_number,
+            "hashed_password": hashed_password,
+            "role": role.value,
+            "created_at": now,
+        }
+        if plan_id is not None:
+            doc["plan_id"] = parse_object_id(plan_id)
+        else:
+            doc["plan_id"] = None
+        result = self._col.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        return _doc_to_user(doc)

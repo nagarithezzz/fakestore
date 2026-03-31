@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.exceptions.custom_exceptions import bad_request, not_found
 from app.models.cdr import CDRType
@@ -9,14 +9,14 @@ from app.repositories.user_repository import UserRepository
 
 
 class CDRService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._db = db
         self._cdr = CDRRepository(db)
         self._users = UserRepository(db)
 
     def add_record(
         self,
-        user_id: int,
+        user_id: str,
         cdr_type: CDRType,
         duration: int,
         data_used: float,
@@ -39,5 +39,5 @@ class CDRService:
             timestamp=timestamp,
         )
 
-    def list_my(self, user_id: int, skip: int, limit: int):
+    def list_my(self, user_id: str, skip: int, limit: int):
         return self._cdr.list_by_user(user_id, skip=skip, limit=limit)

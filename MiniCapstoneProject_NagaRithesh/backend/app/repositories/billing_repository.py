@@ -1,63 +1,97 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
+from pymongo import ReturnDocument
+from pymongo.database import Database
+
+from app.core.mongo_ids import parse_object_id, str_id
 from app.models.billing import Billing, BillingStatus
 
 
+def _doc_to_billing(doc: dict) -> Billing:
+    ga = doc["generated_at"]
+    if ga.tzinfo is None:
+        ga = ga.replace(tzinfo=timezone.utc)
+    return Billing(
+        id=str_id(doc["_id"]),
+        user_id=str(doc["user_id"]),
+        billing_cycle=doc["billing_cycle"],
+        total_amount=float(doc["total_amount"]),
+        status=BillingStatus(doc["status"]),
+        generated_at=ga,
+    )
+
+
 class BillingRepository:
-    def __init__(self, db: Session):
-        self._db = db
+    def __init__(self, db: Database):
+        self._col = db["billing"]
 
-    def get_by_id(self, billing_id: int) -> Billing | None:
-        return self._db.get(Billing, billing_id)
+    def get_by_id(self, billing_id: str) -> Billing | None:
+        try:
+            oid = parse_object_id(billing_id)
+        except ValueError:
+            return None
+        doc = self._col.find_one({"_id": oid})
+        return _doc_to_billing(doc) if doc else None
 
-    def get_by_user_cycle(self, user_id: int, billing_cycle: str) -> Billing | None:
-        stmt = select(Billing).where(
-            Billing.user_id == user_id,
-            Billing.billing_cycle == billing_cycle,
+    def get_by_user_cycle(self, user_id: str, billing_cycle: str) -> Billing | None:
+        doc = self._col.find_one({"user_id": user_id, "billing_cycle": billing_cycle})
+        return _doc_to_billing(doc) if doc else None
+
+    def list_by_user(self, user_id: str) -> list[Billing]:
+        cursor = self._col.find({"user_id": user_id}).sort("generated_at", -1)
+        return [_doc_to_billing(d) for d in cursor]
+
+    def create(self, user_id: str, billing_cycle: str, total_amount: float) -> Billing:
+        now = datetime.now(timezone.utc)
+        doc = {
+            "user_id": user_id,
+            "billing_cycle": billing_cycle,
+            "total_amount": total_amount,
+            "status": BillingStatus.pending.value,
+            "generated_at": now,
+        }
+        result = self._col.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        return _doc_to_billing(doc)
+
+    def update_total(self, billing_id: str, total_amount: float) -> Billing | None:
+        try:
+            oid = parse_object_id(billing_id)
+        except ValueError:
+            return None
+        doc = self._col.find_one_and_update(
+            {"_id": oid},
+            {"$set": {"total_amount": total_amount}},
+            return_document=ReturnDocument.AFTER,
         )
-        return self._db.execute(stmt).scalar_one_or_none()
-
-    def list_by_user(self, user_id: int) -> list[Billing]:
-        stmt = select(Billing).where(Billing.user_id == user_id).order_by(Billing.generated_at.desc())
-        return list(self._db.execute(stmt).scalars().all())
-
-    def create(self, user_id: int, billing_cycle: str, total_amount: float) -> Billing:
-        bill = Billing(
-            user_id=user_id,
-            billing_cycle=billing_cycle,
-            total_amount=total_amount,
-            status=BillingStatus.pending,
-        )
-        self._db.add(bill)
-        self._db.commit()
-        self._db.refresh(bill)
-        return bill
+        return _doc_to_billing(doc) if doc else None
 
     def update_status(self, billing: Billing, status: BillingStatus) -> Billing:
-        billing.status = status
-        self._db.commit()
-        self._db.refresh(billing)
-        return billing
+        oid = parse_object_id(billing.id)
+        doc = self._col.find_one_and_update(
+            {"_id": oid},
+            {"$set": {"status": status.value}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if not doc:
+            return billing
+        return _doc_to_billing(doc)
 
     def sum_paid_amount(self) -> float:
-        from sqlalchemy import func
-
-        stmt = select(func.coalesce(func.sum(Billing.total_amount), 0.0)).where(
-            Billing.status == BillingStatus.paid
-        )
-        return float(self._db.execute(stmt).scalar_one())
+        pipeline = [
+            {"$match": {"status": BillingStatus.paid.value}},
+            {"$group": {"_id": None, "s": {"$sum": "$total_amount"}}},
+        ]
+        agg = list(self._col.aggregate(pipeline))
+        return float(agg[0]["s"]) if agg else 0.0
 
     def sum_pending_amount(self) -> float:
-        from sqlalchemy import func
-
-        stmt = select(func.coalesce(func.sum(Billing.total_amount), 0.0)).where(
-            Billing.status == BillingStatus.pending
-        )
-        return float(self._db.execute(stmt).scalar_one())
+        pipeline = [
+            {"$match": {"status": BillingStatus.pending.value}},
+            {"$group": {"_id": None, "s": {"$sum": "$total_amount"}}},
+        ]
+        agg = list(self._col.aggregate(pipeline))
+        return float(agg[0]["s"]) if agg else 0.0
 
     def count_all(self) -> int:
-        from sqlalchemy import func
-
-        stmt = select(func.count()).select_from(Billing)
-        return int(self._db.execute(stmt).scalar_one())
+        return self._col.count_documents({})

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.exceptions.custom_exceptions import bad_request, forbidden, not_found
 from app.models.billing import BillingStatus
@@ -12,7 +12,7 @@ from app.repositories.user_repository import UserRepository
 
 
 class BillingService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._db = db
         self._billing = BillingRepository(db)
         self._cdr = CDRRepository(db)
@@ -40,7 +40,7 @@ class BillingService:
                 total += rec.data_used * plan.data_rate
         return round(total, 2)
 
-    def generate_bill(self, user_id: int, billing_cycle: str):
+    def generate_bill(self, user_id: str, billing_cycle: str):
         user = self._users.get_by_id(user_id)
         if not user:
             raise not_found("User not found")
@@ -54,16 +54,14 @@ class BillingService:
         total = self._compute_total(records, plan)
         existing = self._billing.get_by_user_cycle(user_id, billing_cycle)
         if existing:
-            existing.total_amount = total
-            self._db.commit()
-            self._db.refresh(existing)
-            return existing
+            updated = self._billing.update_total(existing.id, total)
+            return updated if updated is not None else existing
         return self._billing.create(user_id, billing_cycle, total)
 
-    def list_my(self, user_id: int):
+    def list_my(self, user_id: str):
         return self._billing.list_by_user(user_id)
 
-    def pay_bill(self, billing_id: int, user_id: int):
+    def pay_bill(self, billing_id: str, user_id: str):
         bill = self._billing.get_by_id(billing_id)
         if not bill:
             raise not_found("Bill not found")

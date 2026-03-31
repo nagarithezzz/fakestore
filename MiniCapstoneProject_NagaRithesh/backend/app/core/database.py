@@ -1,41 +1,28 @@
-import re
-
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from pymongo import MongoClient
+from pymongo.database import Database
 
 from app.core.config import settings
 
-
-class Base(DeclarativeBase):
-    pass
+_client: MongoClient | None = None
 
 
-def ensure_database_exists() -> None:
-    url = make_url(settings.database_url)
-    if not url.database:
-        return
-    dbname = url.database
-    if not re.fullmatch(r"[A-Za-z0-9_]+", dbname):
-        raise ValueError("database name in DATABASE_URL must be alphanumeric or underscore")
-    admin_url = url.set(database="postgres")
-    admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT", pool_pre_ping=True)
-    with admin_engine.connect() as conn:
-        row = conn.execute(
-            text("SELECT 1 FROM pg_database WHERE datname = :name"),
-            {"name": dbname},
-        ).scalar_one_or_none()
-        if row is None:
-            conn.execute(text(f'CREATE DATABASE "{dbname}"'))
+def get_client() -> MongoClient:
+    global _client
+    if _client is None:
+        _client = MongoClient(settings.mongodb_uri)
+    return _client
 
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def get_database() -> Database:
+    return get_client()[settings.mongodb_db_name]
 
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    db = get_database()
+    yield db
+
+
+def ensure_indexes(db: Database) -> None:
+    db["users"].create_index("mobile_number", unique=True)
+    db["billing"].create_index([("user_id", 1), ("billing_cycle", 1)], unique=True)
+    db["cdr_records"].create_index([("user_id", 1), ("timestamp", -1)])

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.controllers.auth_controller import AuthController
 from app.core.database import get_db
@@ -8,7 +8,7 @@ from app.schemas.auth_schema import LoginRequest, RegisterRequest, TokenResponse
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def get_controller(db: Session = Depends(get_db)) -> AuthController:
+def get_controller(db: Database = Depends(get_db)) -> AuthController:
     return AuthController(db)
 
 

@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.repositories.billing_repository import BillingRepository
 from app.repositories.cdr_repository import CDRRepository
@@ -6,7 +6,7 @@ from app.repositories.user_repository import UserRepository
 
 
 class AdminService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._db = db
         self._users = UserRepository(db)
         self._cdr = CDRRepository(db)

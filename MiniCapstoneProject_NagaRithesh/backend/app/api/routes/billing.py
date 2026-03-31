@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.controllers.billing_controller import BillingController
 from app.core.database import get_db
@@ -10,7 +10,7 @@ from app.schemas.billing_schema import BillingGenerateRequest, BillingOut
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 
-def get_controller(db: Session = Depends(get_db)) -> BillingController:
+def get_controller(db: Database = Depends(get_db)) -> BillingController:
     return BillingController(db)
 
 
@@ -33,7 +33,7 @@ def my_bills(
 
 @router.put("/pay/{billing_id}", response_model=BillingOut)
 def pay_bill(
-    billing_id: int,
+    billing_id: str,
     user: User = Depends(require_customer),
     ctrl: BillingController = Depends(get_controller),
 ):

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.controllers.cdr_controller import CDRController
 from app.core.database import get_db
@@ -10,7 +10,7 @@ from app.schemas.cdr_schema import CDRCreate, CDROut
 router = APIRouter(prefix="/cdr", tags=["cdr"])
 
 
-def get_controller(db: Session = Depends(get_db)) -> CDRController:
+def get_controller(db: Database = Depends(get_db)) -> CDRController:
     return CDRController(db)
 
 

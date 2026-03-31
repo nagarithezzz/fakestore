@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.schemas.admin_schema import AdminReportsOut
 from app.schemas.user_schema import UserOut
@@ -6,7 +6,7 @@ from app.services.admin_service import AdminService
 
 
 class AdminController:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._service = AdminService(db)
 
     def reports(self) -> AdminReportsOut:

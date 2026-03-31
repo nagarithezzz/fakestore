@@ -9,7 +9,7 @@ class PlanCreate(BaseModel):
 
 
 class PlanOut(BaseModel):
-    id: int
+    id: str
     name: str
     call_rate: float
     sms_rate: float

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.controllers.admin_controller import AdminController
 from app.core.database import get_db
@@ -11,7 +11,7 @@ from app.schemas.user_schema import UserOut
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
-def get_controller(db: Session = Depends(get_db)) -> AdminController:
+def get_controller(db: Database = Depends(get_db)) -> AdminController:
     return AdminController(db)
 
 

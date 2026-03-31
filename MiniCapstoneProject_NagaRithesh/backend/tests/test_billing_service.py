@@ -14,8 +14,17 @@ from app.services.billing_service import BillingService
 
 
 class TestBillingService(unittest.TestCase):
+    def _service(self):
+        s = BillingService.__new__(BillingService)
+        s._db = Mock()
+        s._billing = Mock()
+        s._cdr = Mock()
+        s._users = Mock()
+        s._plans = Mock()
+        return s
+
     def test_compute_total_for_call_sms_data(self):
-        service = BillingService(db=Mock())
+        service = self._service()
         records = [
             SimpleNamespace(type=CDRType.call, duration=10, data_used=0.0),
             SimpleNamespace(type=CDRType.sms, duration=0, data_used=0.0),
@@ -28,70 +37,63 @@ class TestBillingService(unittest.TestCase):
         self.assertEqual(total, 5.11)
 
     def test_cycle_bounds_for_december_rollover(self):
-        service = BillingService(db=Mock())
+        service = self._service()
         start, end = service._cycle_bounds("2026-12")
 
         self.assertEqual(start, datetime(2026, 12, 1, tzinfo=timezone.utc))
         self.assertEqual(end, datetime(2027, 1, 1, tzinfo=timezone.utc))
 
     def test_generate_bill_raises_for_missing_user(self):
-        service = BillingService(db=Mock())
-        service._users = Mock()
+        service = self._service()
         service._users.get_by_id.return_value = None
 
         with self.assertRaises(AppHTTPException) as err:
-            service.generate_bill(user_id=77, billing_cycle="2026-03")
+            service.generate_bill(user_id="507f1f77bcf86cd799439011", billing_cycle="2026-03")
 
         self.assertEqual(err.exception.status_code, 404)
         self.assertEqual(err.exception.detail, "User not found")
 
     def test_generate_bill_updates_existing_bill(self):
-        db = Mock()
-        service = BillingService(db=db)
-        service._users = Mock()
-        service._plans = Mock()
-        service._cdr = Mock()
-        service._billing = Mock()
+        service = self._service()
 
-        user = SimpleNamespace(id=1, plan_id=2)
+        user = SimpleNamespace(id="u1", plan_id="p1")
         plan = SimpleNamespace(call_rate=1.0, sms_rate=1.0, data_rate=1.0)
         records = [SimpleNamespace(type=CDRType.call, duration=10, data_used=0.0)]
-        existing = SimpleNamespace(total_amount=0.0)
+        existing = SimpleNamespace(id="b1", total_amount=0.0)
+        updated = SimpleNamespace(id="b1", total_amount=10.0)
 
         service._users.get_by_id.return_value = user
         service._plans.get_by_id.return_value = plan
         service._cdr.list_by_user_in_cycle.return_value = records
         service._billing.get_by_user_cycle.return_value = existing
+        service._billing.update_total.return_value = updated
 
-        result = service.generate_bill(user_id=1, billing_cycle="2026-03")
+        result = service.generate_bill(user_id="u1", billing_cycle="2026-03")
 
-        self.assertIs(result, existing)
-        self.assertEqual(existing.total_amount, 10.0)
-        db.commit.assert_called_once()
-        db.refresh.assert_called_once_with(existing)
+        self.assertIs(result, updated)
+        self.assertEqual(result.total_amount, 10.0)
+        service._billing.update_total.assert_called_once_with("b1", 10.0)
         service._billing.create.assert_not_called()
 
     def test_pay_bill_marks_pending_bill_as_paid(self):
-        service = BillingService(db=Mock())
-        service._billing = Mock()
-        bill = SimpleNamespace(id=5, user_id=1, status=BillingStatus.pending)
+        service = self._service()
+        bill = SimpleNamespace(id="5", user_id="1", status=BillingStatus.pending)
         service._billing.get_by_id.return_value = bill
         service._billing.update_status.return_value = bill
 
-        result = service.pay_bill(billing_id=5, user_id=1)
+        result = service.pay_bill(billing_id="5", user_id="1")
 
         self.assertIs(result, bill)
         service._billing.update_status.assert_called_once_with(bill, BillingStatus.paid)
 
     def test_pay_bill_rejects_wrong_owner(self):
-        service = BillingService(db=Mock())
-        service._billing = Mock()
+        service = self._service()
         service._billing.get_by_id.return_value = SimpleNamespace(
-            id=5, user_id=2, status=BillingStatus.pending
+            id="5", user_id="2", status=BillingStatus.pending
         )
 
         with self.assertRaises(AppHTTPException) as err:
-            service.pay_bill(billing_id=5, user_id=1)
+            service.pay_bill(billing_id="5", user_id="1")
 
         self.assertEqual(err.exception.status_code, 403)
         self.assertEqual(err.exception.detail, "Not your bill")

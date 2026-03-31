@@ -1,11 +1,11 @@
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.schemas.plan_schema import PlanCreate, PlanOut
 from app.services.plan_service import PlanService
 
 
 class PlanController:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._service = PlanService(db)
 
     def list_plans(self) -> list[PlanOut]:

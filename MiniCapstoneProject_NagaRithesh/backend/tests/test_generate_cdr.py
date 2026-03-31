@@ -2,7 +2,9 @@ import sys
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
+
+from bson import ObjectId
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -28,7 +30,8 @@ class TestGenerateCDRScript(unittest.TestCase):
                 return 3 if (a, b) == (0, 60 * 24 * 30) else 120
 
         now = datetime(2026, 3, 31, tzinfo=timezone.utc)
-        cdr = random_cdr(user_id=1, rng=FixedRng(), now=now)
+        oid = "507f1f77bcf86cd799439011"
+        cdr = random_cdr(user_id=oid, rng=FixedRng(), now=now)
 
         self.assertEqual(cdr.cdr_type, CDRType.call)
         self.assertEqual(cdr.duration, 120)
@@ -47,7 +50,7 @@ class TestGenerateCDRScript(unittest.TestCase):
                 return 2.345
 
         cdr = random_cdr(
-            user_id=2,
+            user_id="507f191e810c19729de860ea",
             rng=FixedRng(),
             now=datetime(2026, 3, 31, tzinfo=timezone.utc),
         )
@@ -59,8 +62,10 @@ class TestGenerateCDRScript(unittest.TestCase):
 
     @patch("scripts.generate_cdr.CDRService")
     def test_generate_for_users_creates_records_for_each_user(self, service_cls):
-        db = Mock()
-        db.execute.return_value.scalars.return_value.all.return_value = [10, 20]
+        oid1 = ObjectId()
+        oid2 = ObjectId()
+        db = MagicMock()
+        db["users"].find.return_value = [{"_id": oid1}, {"_id": oid2}]
         service = Mock()
         service_cls.return_value = service
 
@@ -69,7 +74,7 @@ class TestGenerateCDRScript(unittest.TestCase):
         self.assertEqual(created, 6)
         self.assertEqual(service.add_record.call_count, 6)
         first_call = service.add_record.call_args_list[0].kwargs
-        self.assertEqual(first_call["user_id"], 10)
+        self.assertEqual(first_call["user_id"], str(oid1))
 
 
 if __name__ == "__main__":

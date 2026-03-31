@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.controllers.plan_controller import PlanController
 from app.core.database import get_db
@@ -10,7 +10,7 @@ from app.schemas.plan_schema import PlanCreate, PlanOut
 router = APIRouter(prefix="/plans", tags=["plans"])
 
 
-def get_controller(db: Session = Depends(get_db)) -> PlanController:
+def get_controller(db: Database = Depends(get_db)) -> PlanController:
     return PlanController(db)
 
 

@@ -1,11 +1,11 @@
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.schemas.auth_schema import LoginRequest, RegisterRequest, TokenResponse
 from app.services.auth_service import AuthService
 
 
 class AuthController:
-    def __init__(self, db: Session):
+    def __init__(self, db: Database):
         self._service = AuthService(db)
 
     def register(self, body: RegisterRequest) -> TokenResponse:

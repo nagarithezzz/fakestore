@@ -1,6 +1,6 @@
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+from pymongo.database import Database
 
 from app.core.database import get_db
 from app.core.security import decode_token
@@ -13,16 +13,15 @@ security = HTTPBearer(auto_error=False)
 
 def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
-    db: Session = Depends(get_db),
+    db: Database = Depends(get_db),
 ) -> User | None:
     if not credentials:
         return None
     payload = decode_token(credentials.credentials)
     if not payload or "sub" not in payload:
         raise unauthorized("Invalid or expired token")
-    try:
-        uid = int(payload["sub"])
-    except (ValueError, TypeError):
+    uid = payload["sub"]
+    if not isinstance(uid, str) or not uid:
         raise unauthorized("Invalid token subject")
     user = UserRepository(db).get_by_id(uid)
     if not user:
