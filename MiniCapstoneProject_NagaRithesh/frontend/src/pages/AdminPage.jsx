@@ -48,7 +48,7 @@ export function AdminPage() {
     setMsg("");
     try {
       await addCdr({
-        user_id: Number(cdrForm.user_id),
+        user_id: cdrForm.user_id.trim(),
         type: cdrForm.type,
         duration: Number(cdrForm.duration) || 0,
         data_used: Number(cdrForm.data_used) || 0,
@@ -70,7 +70,7 @@ export function AdminPage() {
     setMsg("");
     try {
       await generateBill({
-        user_id: Number(billForm.user_id),
+        user_id: billForm.user_id.trim(),
         billing_cycle: billForm.billing_cycle,
       });
       setMsg("Bill generated.");
@@ -168,11 +168,11 @@ export function AdminPage() {
             <label>
               User ID
               <input
-                type="number"
+                type="text"
                 value={cdrForm.user_id}
                 onChange={(e) => setCdrForm((f) => ({ ...f, user_id: e.target.value }))}
                 required
-                min={1}
+                placeholder="Enter user id (UUID/ObjectId)"
               />
             </label>
             <label>
@@ -224,11 +224,11 @@ export function AdminPage() {
             <label>
               User ID
               <input
-                type="number"
+                type="text"
                 value={billForm.user_id}
                 onChange={(e) => setBillForm((f) => ({ ...f, user_id: e.target.value }))}
                 required
-                min={1}
+                placeholder="Enter user id (UUID/ObjectId)"
               />
             </label>
             <label>
