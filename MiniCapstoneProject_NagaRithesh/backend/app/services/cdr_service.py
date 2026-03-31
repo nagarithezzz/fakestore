@@ -39,5 +39,20 @@ class CDRService:
             timestamp=timestamp,
         )
 
-    def list_my(self, user_id: str, skip: int, limit: int):
-        return self._cdr.list_by_user(user_id, skip=skip, limit=limit)
+    def list_my(
+        self,
+        user_id: str,
+        skip: int,
+        limit: int,
+        cdr_type: CDRType | None = None,
+        from_ts: datetime | None = None,
+        to_ts: datetime | None = None,
+    ):
+        return self._cdr.list_by_user(
+            user_id,
+            skip=skip,
+            limit=limit,
+            cdr_type=cdr_type,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )

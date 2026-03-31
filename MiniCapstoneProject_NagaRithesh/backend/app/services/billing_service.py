@@ -58,8 +58,13 @@ class BillingService:
             return updated if updated is not None else existing
         return self._billing.create(user_id, billing_cycle, total)
 
-    def list_my(self, user_id: str):
-        return self._billing.list_by_user(user_id)
+    def list_my(
+        self,
+        user_id: str,
+        status: BillingStatus | None = None,
+        billing_cycle: str | None = None,
+    ):
+        return self._billing.list_by_user(user_id, status=status, billing_cycle=billing_cycle)
 
     def pay_bill(self, billing_id: str, user_id: str):
         bill = self._billing.get_by_id(billing_id)

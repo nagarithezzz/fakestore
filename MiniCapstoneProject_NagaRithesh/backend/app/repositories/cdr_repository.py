@@ -49,10 +49,25 @@ class CDRRepository:
         doc["_id"] = result.inserted_id
         return _doc_to_cdr(doc)
 
-    def list_by_user(self, user_id: str, skip: int = 0, limit: int = 100) -> list[CDRRecord]:
-        cursor = (
-            self._col.find({"user_id": user_id}).sort("timestamp", -1).skip(skip).limit(limit)
-        )
+    def list_by_user(
+        self,
+        user_id: str,
+        skip: int = 0,
+        limit: int = 100,
+        cdr_type: CDRType | None = None,
+        from_ts: datetime | None = None,
+        to_ts: datetime | None = None,
+    ) -> list[CDRRecord]:
+        query: dict = {"user_id": user_id}
+        if cdr_type is not None:
+            query["type"] = cdr_type.value
+        if from_ts is not None or to_ts is not None:
+            query["timestamp"] = {}
+            if from_ts is not None:
+                query["timestamp"]["$gte"] = from_ts
+            if to_ts is not None:
+                query["timestamp"]["$lte"] = to_ts
+        cursor = self._col.find(query).sort("timestamp", -1).skip(skip).limit(limit)
         return [_doc_to_cdr(d) for d in cursor]
 
     def list_by_user_in_cycle(

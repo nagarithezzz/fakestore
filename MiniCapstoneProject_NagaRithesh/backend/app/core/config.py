@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "cdr_billing"
-    secret_key: str = "dev-secret-change-in-production"
+    secret_key: str = "prodapt@123"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 10080
 

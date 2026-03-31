@@ -35,8 +35,19 @@ class UserRepository:
         doc = self._col.find_one({"mobile_number": mobile_number})
         return _doc_to_user(doc) if doc else None
 
-    def list_all(self) -> list[User]:
-        docs = self._col.find().sort("_id", 1)
+    def list_all(
+        self,
+        role: UserRole | None = None,
+        mobile_contains: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[User]:
+        query: dict = {}
+        if role is not None:
+            query["role"] = role.value
+        if mobile_contains:
+            query["mobile_number"] = {"$regex": mobile_contains}
+        docs = self._col.find(query).sort("_id", 1).skip(skip).limit(limit)
         return [_doc_to_user(d) for d in docs]
 
     def count(self) -> int:

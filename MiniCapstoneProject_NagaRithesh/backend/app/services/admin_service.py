@@ -1,5 +1,6 @@
 from pymongo.database import Database
 
+from app.models.user import UserRole
 from app.repositories.billing_repository import BillingRepository
 from app.repositories.cdr_repository import CDRRepository
 from app.repositories.user_repository import UserRepository
@@ -21,5 +22,13 @@ class AdminService:
             "total_bills": self._billing.count_all(),
         }
 
-    def list_users(self):
-        return self._users.list_all()
+    def list_users(
+        self,
+        role: UserRole | None = None,
+        mobile_contains: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ):
+        return self._users.list_all(
+            role=role, mobile_contains=mobile_contains, skip=skip, limit=limit
+        )

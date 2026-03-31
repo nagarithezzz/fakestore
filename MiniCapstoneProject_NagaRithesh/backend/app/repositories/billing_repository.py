@@ -37,8 +37,18 @@ class BillingRepository:
         doc = self._col.find_one({"user_id": user_id, "billing_cycle": billing_cycle})
         return _doc_to_billing(doc) if doc else None
 
-    def list_by_user(self, user_id: str) -> list[Billing]:
-        cursor = self._col.find({"user_id": user_id}).sort("generated_at", -1)
+    def list_by_user(
+        self,
+        user_id: str,
+        status: BillingStatus | None = None,
+        billing_cycle: str | None = None,
+    ) -> list[Billing]:
+        query: dict = {"user_id": user_id}
+        if status is not None:
+            query["status"] = status.value
+        if billing_cycle is not None:
+            query["billing_cycle"] = billing_cycle
+        cursor = self._col.find(query).sort("generated_at", -1)
         return [_doc_to_billing(d) for d in cursor]
 
     def create(self, user_id: str, billing_cycle: str, total_amount: float) -> Billing:
